@@ -1,0 +1,417 @@
+<!doctype html>
+<html>
+	<head>
+		<meta charset="utf-8">
+		<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+
+		<title>reveal.js</title>
+
+		<link rel="stylesheet" href="css/reveal.css">
+		<link rel="stylesheet" href="css/custom.css">
+		<link rel="stylesheet" href="css/theme/beige.css">
+		<!-- Theme used for syntax highlighting of code -->
+		<link rel="stylesheet" href="lib/css/zenburn.css">
+
+		<!-- Printing and PDF exports -->
+		<script>
+			var link = document.createElement( 'link' );
+			link.rel = 'stylesheet';
+			link.type = 'text/css';
+			link.href = window.location.search.match( /print-pdf/gi ) ? 'css/print/pdf.css' : 'css/print/paper.css';
+			document.getElementsByTagName( 'head' )[0].appendChild( link );
+		</script>
+		<script type="text/javascript" src="js/jquery.js"></script>
+	</head>
+	<body>
+		<div class="reveal">
+			<div class="slides">
+				<section>
+				<h1>Semaphores</h1>
+				<br />
+				<p>Presentation by Pruthvik N Narayanaswamy</p>
+				<p id="time"></p>
+				<!-- Slide 1 -->
+				</section>
+				
+				<section>
+					<section id="fragments">
+						<h1>Introduction</h1>
+						<ul>
+							<li>
+								<p class="fragment">What is a semaphore ?</p>
+							</li>
+							<li>
+								<p class="fragment">Why are they used ?</p>
+							</li>
+						</ul>
+						<br>
+						<p class="fragment">Then...</p>
+						<br>
+						<p class="fragment">What is a mutex?</p>
+					</section>
+				</ul>
+				<!-- Slide 2 -->
+				</section>
+
+				<section>	
+				<!-- Slide 4 -->
+					<section>
+						<h1>Usage and functions</h1>
+						<h3>The Types</h3>
+					</section>
+					<section>
+						<h3>System V Semaphores</h3>
+						  <pre><code data-trim data-noescape>
+//System semaphore initialisation
+int semctl(int  semid, int semnum, int cmd, ...);
+
+//Operation
+int semop(int  semid, struct sembuf *sops, size_t nsops);
+
+//User-defined array of semaphore structure
+struct  sembuf {
+   ushort sem_num; /* identifies which semaphore in the set */
+   short sem_op; /* could be positive,negative or zero */
+   short sem_flg; /*coud be IPC_NOWAIT ,SEM_UNDO*/
+};
+  						</code></pre>
+					</section>
+					<section>
+						<h3>POSIX Semaphore</h3>
+						 <pre><code data-trim data-noescape>
+						 sem_t *sem_open(const char *name,  int oflag, mode_t mode , int value);
+
+/*This call locks the semaphore if the semaphore count is greater than
+ zero. After locking the semaphore, the count is reduced by 1. If the
+  semaphore count is zero, the call blocks.*/
+int  sem_wait(sem_t *sem);
+
+/*
+This call increases the semaphore count by 1 and then returns.
+*/
+int  sem_post(sem_t *sem);
+
+//close
+sem_close();
+
+sem_unlink();
+</code></pre>
+					</section>
+				</section>
+
+				<section>
+				<h1>What is the difference ?</h1>
+				<!-- Slide 3 -->
+				</section>
+
+				<section>
+					<section>
+						<h1>Deadlock</h1>
+						<!-- Slide 5 -->
+						<br>
+						<p id="conditions">The four necessary conditions </p>
+					</section>
+					<section id="mutual-exclusion">
+						<h2 id="condition-me">Mutual Exclusion</h2>
+					</section>
+					<section id="hold-and-wait">
+						<h2 id="condition-hw">Hold and Wait</h2>
+					</section>
+					<section id="no-preemption">
+						<h2 id="condition-np">No Preemption</h2>
+					</section>
+					<section id="circular-wait">
+						<h2 id="condition-cw">Circular Wait</h2>
+						<a id="deadlock-solution" onclick="conditions()" href="#/4">Solution ?</a>
+					</section>
+				</section>
+
+				<section data-background-image="images/dining.png" data-background-size="1000px">
+				<h4 id="dining-title">Dining Philosophers Problem</h4>
+				<br />
+				<!-- Slide 6 -->
+				</section>
+
+				<section>
+					<section>
+					<h2>Solution</h2>
+					<br />
+					<!-- Slide 7 -->
+					</section>
+					<section>
+					<h4>params_t struct and functions</h4>
+						<pre><code data-trim data-noescape>
+#include 'stdio.h'
+#include 'stdlib.h'
+#include 'pthread.h'
+#include 'semaphore.h'
+
+typedef struct {
+  int position;
+  int count;
+  sem_t *forks;
+  sem_t *lock;
+} params_t;
+
+void initialize_semaphores(sem_t *lock, sem_t *forks, int num_forks);
+void run_all_threads(pthread_t *threads, sem_t *forks, sem_t *lock, int num_philosophers);
+
+void *philosopher(void *params);
+void think(int position);
+void eat(int position);
+
+void think(int position)
+{
+  printf("Philosopher %d thinking...\n", position);
+}
+
+void eat(int position)
+{
+  printf("Philosopher %d eating...\n", position);
+}
+						</code></pre>
+					</section>
+					<section>
+					<h4>main function</h4>
+						<pre><code data-trim data-noescape>
+int main(int argc, char *args[])
+{
+  int num_philosophers = 5;
+
+  sem_t lock;
+  sem_t forks[num_philosophers];
+  pthread_t philosophers[num_philosophers];
+
+  initialize_semaphores(&lock, forks, num_philosophers);
+  run_all_threads(philosophers, forks, &lock, num_philosophers);
+  pthread_exit(NULL);
+}
+						</code></pre>
+					</section>
+					<section>
+					<h4>the initialize semaphores function</h4>
+						<pre><code data-trim data-noescape>
+void initialize_semaphores(sem_t *lock, sem_t *forks, int num_forks)
+{
+  int i;
+  for(i = 0; i < num_forks; i++) {
+    sem_init(&forks[i], 0, 1);
+  }
+
+  sem_init(lock, 0, num_forks - 1);
+}						
+						</code></pre>
+					</section>
+					<section>
+					<h4>run_all_threads function</h4>
+						<pre><code data-trim data-noescape>
+void run_all_threads(pthread_t *threads, sem_t *forks, sem_t *lock, int num_philosophers)
+{
+  int i;
+  for(i = 0; i < num_philosophers; i++) {
+    params_t *arg = malloc(sizeof(params_t));
+    arg->position = i;
+    arg->count = num_philosophers;
+    arg->lock = lock;
+    arg->forks = forks;
+
+    pthread_create(&threads[i], NULL, philosopher, (void *)arg);
+  }
+}
+						</code></pre>
+					</section>
+					<section>
+					<h4>the philosopher function</h4>
+						<pre><code data-trim data-noescape>
+void *philosopher(void *params)
+{
+  int i;
+  params_t self = *(params_t *)params;
+
+  for(i = 0; i < 3; i++) {
+    think(self.position);
+
+    sem_wait(self.lock);
+    sem_wait(&self.forks[self.position]);
+    sem_wait(&self.forks[(self.position + 1) % self.count]);
+    eat(self.position);
+    sem_post(&self.forks[self.position]);
+    sem_post(&self.forks[(self.position + 1) % self.count]);
+    sem_post(self.lock);
+  }
+
+  think(self.position);
+  pthread_exit(NULL);
+}
+						</code></pre>
+					</section>
+				</section>
+
+				<section>
+				<h3>Questions ? </h3>
+				<br />
+				<h2>Thank you</h2>
+				<!-- Slide 8 -->
+				</section>
+
+			</div>
+		</div>
+
+		<script src="lib/js/head.min.js"></script>
+		<script src="js/reveal.js"></script>
+
+		<script>
+			Reveal.initialize({
+				history: true,
+				dependencies: [
+					{ src: 'plugin/menu/menu.js' },
+					{ src: 'plugin/markdown/marked.js' },
+					{ src: 'plugin/markdown/markdown.js' },
+					{ src: 'plugin/notes/notes.js', async: true },
+					{ src: 'plugin/highlight/highlight.js', async: true, callback: function() { hljs.initHighlightingOnLoad(); } }
+				],
+				menu: {
+        		side: 'left',
+        		numbers: false,
+        		titleSelector: 'h4',
+        		hideMissingTitles: true,
+        		markers: false,
+        		transitions: false,
+        		openButton: true,
+        		themes: false,
+        		openSlideNumber: false,
+        		keyboard: true
+   			}
+		});
+			document.getElementById("time").innerHTML = new Date().toDateString();
+
+			function conditions(){
+				$('#deadlock-solution').html('');
+				var _text = "";
+				$(document).ready(function() {
+    		_text = $('#conditions').text();
+    		StrikeThrough(0);
+				});
+
+				function StrikeThrough(index) {
+    			if (index >= _text.length)
+        	return false;
+    		var sToStrike = _text.substr(0, index + 1);
+    		var sAfter = (index < (_text.length - 1)) ? _text.substr(index + 1, _text.length - index) : "";
+    			$('#conditions').html("<strike>" + sToStrike + "</strike>" + sAfter);
+    		window.setTimeout(function() {
+        StrikeThrough(index + 1);
+    		}, 100);
+			}
+   		 $("#mutual-exclusion").attr("data-state","new_conditions_me");
+		}
+		
+		Reveal.addEventListener( 'new_conditions_me', function() {
+    	var _text = "";
+				$(document).ready(function() {
+    		_text = $('#condition-me').text();
+    		StrikeThrough(0);
+				});
+
+				function StrikeThrough(index) {
+    			if (index >= _text.length)
+        	return false;
+    		var sToStrike = _text.substr(0, index + 1);
+    		var sAfter = (index < (_text.length - 1)) ? _text.substr(index + 1, _text.length - index) : "";
+    			$('#condition-me').html("<strike>" + sToStrike + "</strike>" + sAfter);
+    		window.setTimeout(function() {
+        StrikeThrough(index + 1);
+    		}, 100);
+
+			}
+			if (!$('#condition-me').hasClass("checked")) {
+				$('#condition-me').addClass("checked");
+				var txt1 = "<b></b> <h2>Exclusive Access</h2>";
+				var txt2 = "<b></b> <h2>Shared Resources</h2>";
+			$("#condition-me").after(txt1);
+			
+			}
+			$("#hold-and-wait").attr("data-state","new_conditions_hw");
+		}, false );
+
+		Reveal.addEventListener( 'new_conditions_hw', function() {
+    	var _text = "";
+				$(document).ready(function() {
+    		_text = $('#condition-hw').text();
+    		StrikeThrough(0);
+				});
+
+				function StrikeThrough(index) {
+    			if (index >= _text.length)
+        	return false;
+    		var sToStrike = _text.substr(0, index + 1);
+    		var sAfter = (index < (_text.length - 1)) ? _text.substr(index + 1, _text.length - index) : "";
+    			$('#condition-hw').html("<strike>" + sToStrike + "</strike>" + sAfter);
+    		window.setTimeout(function() {
+        StrikeThrough(index + 1);
+    		}, 100);
+
+			}
+			if (!$('#condition-hw').hasClass("checked")) {
+				$('#condition-hw').addClass("checked");
+				var txt1 = "<b></b> <h2>Request all</h2>";
+			$("#condition-hw").after(txt1);
+			
+			}
+			$("#no-preemption").attr("data-state","new_conditions_np");
+		}, false );
+
+		Reveal.addEventListener( 'new_conditions_np', function() {
+    	var _text = "";
+				$(document).ready(function() {
+    		_text = $('#condition-np').text();
+    		StrikeThrough(0);
+				});
+
+				function StrikeThrough(index) {
+    			if (index >= _text.length)
+        	return false;
+    		var sToStrike = _text.substr(0, index + 1);
+    		var sAfter = (index < (_text.length - 1)) ? _text.substr(index + 1, _text.length - index) : "";
+    			$('#condition-np').html("<strike>" + sToStrike + "</strike>" + sAfter);
+    		window.setTimeout(function() {
+        StrikeThrough(index + 1);
+    		}, 100);
+
+			}
+			if (!$('#condition-np').hasClass("checked")) {
+				$('#condition-np').addClass("checked");
+				var txt1 = "<b></b> <h2>Make them Preemptable</h2>";
+			$("#condition-np").after(txt1);
+			
+			}
+			$("#circular-wait").attr("data-state","new_conditions_cw");
+		}, false );
+
+		Reveal.addEventListener( 'new_conditions_cw', function() {
+    	var _text = "";
+				$(document).ready(function() {
+    		_text = $('#condition-cw').text();
+    		StrikeThrough(0);
+				});
+
+				function StrikeThrough(index) {
+    			if (index >= _text.length)
+        	return false;
+    		var sToStrike = _text.substr(0, index + 1);
+    		var sAfter = (index < (_text.length - 1)) ? _text.substr(index + 1, _text.length - index) : "";
+    			$('#condition-cw').html("<strike>" + sToStrike + "</strike>" + sAfter);
+    		window.setTimeout(function() {
+        StrikeThrough(index + 1);
+    		}, 100);
+
+			}
+			if (!$('#condition-cw').hasClass("checked")) {
+				$('#condition-cw').addClass("checked");
+				var txt1 = "<b></b> <h2>Ordering</h2>";
+			$("#condition-cw").after(txt1);
+			}
+		}, false );
+		</script>
+	</body>
+</html>
